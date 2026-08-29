@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { WorkoutRecord } from "../types";
+import { WorkoutRecord, UnitSystem } from "../types";
+import { formatWeight, convertWeightForInput, getWeightLabel } from "../lib/units";
 import { Dumbbell, Search, Filter } from "lucide-react";
 
-export function WorkoutProgress({ userId }: { userId: string }) {
+export function WorkoutProgress({ userId, unitSystem }: { userId: string, unitSystem: UnitSystem }) {
   const [workouts, setWorkouts] = useState<WorkoutRecord[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -176,7 +177,7 @@ export function WorkoutProgress({ userId }: { userId: string }) {
                         <span className="text-zinc-500 w-12 font-mono">
                           {set.isWarmup ? "W" : set.isFailure ? "F" : `S${set.setOrder || idx + 1}`}
                         </span>
-                        <span className="text-zinc-300 w-20 text-right">{set.weight.toFixed(1)} kg</span>
+                        <span className="text-zinc-300 w-20 text-right">{formatWeight(set.weight, unitSystem)}</span>
                         <span className="text-zinc-300 w-16 text-right">{set.reps} reps</span>
                         <span className="text-zinc-500 w-16 text-right">
                           {set.rpe > 0 ? `RPE ${set.rpe}` : '-'}
@@ -188,7 +189,7 @@ export function WorkoutProgress({ userId }: { userId: string }) {
                   <div className="mt-4 pt-3 border-t border-zinc-800 flex items-center justify-between text-xs text-zinc-400 font-medium">
                     <span className="flex items-center gap-1.5">
                       <span className="text-zinc-500">Vol</span>
-                      <span className="text-zinc-200">{workout.sets.reduce((acc, set) => acc + (set.weight * set.reps), 0).toFixed(1)} kg</span>
+                      <span className="text-zinc-200">{formatWeight(workout.sets.reduce((acc, set) => acc + (set.weight * set.reps), 0), unitSystem)}</span>
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="text-zinc-500">Avg RPE</span>

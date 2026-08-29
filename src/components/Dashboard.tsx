@@ -1,18 +1,41 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { User, signOut } from "firebase/auth";
-import { auth } from "../lib/firebase";
-import { Activity, Camera, Dumbbell, LineChart, LogOut, FileText } from "lucide-react";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../lib/firebase";
+import { Activity, Camera, Dumbbell, LineChart, LogOut, FileText, Settings as SettingsIcon } from "lucide-react";
 import { cn } from "../lib/utils";
+import { format, subMonths } from "date-fns";
 import { DailyLogForm } from "./DailyLogForm";
 import { WorkoutUpload } from "./WorkoutUpload";
 import { WorkoutProgress } from "./WorkoutProgress";
 import { Charts } from "./Charts";
 import { ProgressGallery } from "./ProgressGallery";
+import { DateRangePicker } from "./DateRangePicker";
+import { Settings } from "./Settings";
+import { UserSettings, UnitSystem } from "../types";
 
-type Tab = "overview" | "logs" | "workouts" | "gallery";
+type Tab = "overview" | "logs" | "workouts" | "gallery" | "settings";
 
 export function Dashboard({ user }: { user: User }) {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>("metric");
+  
+  // Global date range filter for charts and history
+  const [dateRange, setDateRange] = useState({
+    start: format(subMonths(new Date(), 1), "yyyy-MM-dd"),
+    end: format(new Date(), "yyyy-MM-dd")
+  });
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      const docRef = doc(db, "users", user.uid, "settings", "preferences");
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setUnitSystem(docSnap.data().unitSystem || "metric");
+      }
+    };
+    loadSettings();
+  }, [user.uid]);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row font-sans">
@@ -37,6 +60,9 @@ export function Dashboard({ user }: { user: User }) {
           </NavItem>
           <NavItem active={activeTab === "gallery"} onClick={() => setActiveTab("gallery")} icon={<Camera className="w-4 h-4" />}>
             Gallery
+          </NavItem>
+          <NavItem active={activeTab === "settings"} onClick={() => setActiveTab("settings")} icon={<SettingsIcon className="w-4 h-4" />}>
+            Settings
           </NavItem>
         </div>
 
@@ -67,24 +93,52 @@ export function Dashboard({ user }: { user: User }) {
       {/* Main Content Area */}
       <main className="flex-1 min-w-0 p-4 md:p-8 lg:p-10 overflow-y-auto">
         <div className="max-w-6xl mx-auto space-y-8">
-          {activeTab === "overview" && <Charts userId={user.uid} />}
+          
+          {/* Global Header / Filters */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-zinc-900 border border-zinc-800 p-4 rounded-xl">
+            <div>
+              <h1 className="text-lg font-semibold text-zinc-100 capitalize">
+                {activeTab === "logs" ? "Logs & Targets" : activeTab}
+              </h1>
+              <p className="text-sm text-zinc-400">
+                {activeTab === "overview" && "Analyze your performance trends"}
+                {activeTab === "logs" && "Manage your daily logs and nutrition targets"}
+                {activeTab === "workouts" && "Track your progressive overload"}
+                {activeTab === "gallery" && "View your physical progress"}
+              </p>
+            </div>
+            
+            {(activeTab === "overview" || activeTab === "logs" || activeTab === "workouts") && (
+              <DateRangePicker 
+                startDate={dateRange.start} 
+                endDate={dateRange.end} 
+                onStartDateChange={(start) => setDateRange(prev => ({ ...prev, start }))} 
+                onEndDateChange={(end) => setDateRange(prev => ({ ...prev, end }))} 
+              />
+            )}
+          </div>
+
+          {activeTab === "overview" && <Charts userId={user.uid} dateRange={dateRange} unitSystem={unitSystem} />}
           
           {activeTab === "logs" && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <DailyLogForm userId={user.uid} />
-              {/* Optional: we could add a list of recent logs here */}
+              <DailyLogForm userId={user.uid} dateRange={dateRange} unitSystem={unitSystem} />
             </div>
           )}
 
           {activeTab === "workouts" && (
             <div className="space-y-8">
-              <WorkoutUpload userId={user.uid} />
-              <WorkoutProgress userId={user.uid} />
+              <WorkoutUpload userId={user.uid} unitSystem={unitSystem} />
+              <WorkoutProgress userId={user.uid} unitSystem={unitSystem} />
             </div>
           )}
 
           {activeTab === "gallery" && (
-            <ProgressGallery userId={user.uid} />
+            <ProgressGallery userId={user.uid} unitSystem={unitSystem} />
+          )}
+
+          {activeTab === "settings" && (
+            <Settings userId={user.uid} onSettingsChange={(s) => setUnitSystem(s.unitSystem)} />
           )}
         </div>
       </main>

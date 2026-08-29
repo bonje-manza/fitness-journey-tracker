@@ -35,6 +35,14 @@ service cloud.firestore {
              data.fat is number;
     }
 
+    // -- User Settings --
+    function isValidUserSettings(data) {
+      return data.keys().hasAll(['unitSystem']) &&
+             data.keys().size() == 1 &&
+             data.unitSystem is string &&
+             (data.unitSystem == 'metric' || data.unitSystem == 'imperial');
+    }
+
     // -- Daily Log --
     function isValidDailyLog(data, userId) {
       return data.keys().hasAll(['userId', 'date', 'steps', 'caloriesConsumed', 'protein', 'carbs', 'fat', 'bodyWeight', 'sleepHours', 'timestamp']) &&
@@ -83,7 +91,10 @@ service cloud.firestore {
     match /users/{userId} {
       match /settings/{settingId} {
         allow read: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidUserTargets(incoming());
+        allow create, update: if isOwner(userId) && (
+          (settingId == 'targets' && isValidUserTargets(incoming())) ||
+          (settingId == 'preferences' && isValidUserSettings(incoming()))
+        );
         allow delete: if isOwner(userId);
       }
       

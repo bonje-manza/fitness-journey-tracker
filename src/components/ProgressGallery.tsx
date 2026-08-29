@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { ProgressPicture } from "../types";
+import { ProgressPicture, UnitSystem } from "../types";
+import { formatWeight } from "../lib/units";
 import { Camera, ImagePlus, X, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 
@@ -48,7 +49,7 @@ const compressImageToBase64 = (file: File, maxSizeMB: number = 0.5): Promise<str
   });
 };
 
-export function ProgressGallery({ userId }: { userId: string }) {
+export function ProgressGallery({ userId, unitSystem }: { userId: string, unitSystem: UnitSystem }) {
   const [photos, setPhotos] = useState<ProgressPicture[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -187,7 +188,7 @@ export function ProgressGallery({ userId }: { userId: string }) {
                 <span className="text-sm font-medium text-zinc-300">{photo.date}</span>
                 {photo.bodyWeight > 0 ? (
                   <span className="text-xs text-zinc-400 bg-zinc-950 px-2 py-1 rounded-md border border-zinc-800">
-                    {photo.bodyWeight} kg
+                    {formatWeight(photo.bodyWeight, unitSystem)}
                   </span>
                 ) : (
                   <span className="text-xs text-zinc-600">—</span>

@@ -3,8 +3,10 @@ import Papa from "papaparse";
 import { Upload, FileText, CheckCircle, AlertCircle } from "lucide-react";
 import { collection, doc, writeBatch } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import { UnitSystem } from "../types";
+import { lbsToKg } from "../lib/units";
 
-export function WorkoutUpload({ userId }: { userId: string }) {
+export function WorkoutUpload({ userId, unitSystem }: { userId: string, unitSystem: UnitSystem }) {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<"idle" | "parsing" | "uploading" | "success" | "error">("idle");
@@ -66,7 +68,14 @@ export function WorkoutUpload({ userId }: { userId: string }) {
             
             // Find the weight column dynamically since it might be "Weight (kg)" or "Weight (lbs)"
             const weightKey = Object.keys(row).find(k => k.toLowerCase().includes("weight"));
-            const weight = parseFloat(weightKey ? row[weightKey] : 0) || 0;
+            let weight = parseFloat(weightKey ? row[weightKey] : 0) || 0;
+            
+            // If the CSV explicitly says lbs, convert to kg for storage.
+            // If it doesn't specify, we might assume the user's current unitSystem but usually Strong specifies it.
+            if (weightKey && weightKey.toLowerCase().includes("lbs")) {
+              weight = lbsToKg(weight);
+            }
+
             const reps = parseInt(row.Reps) || 0;
             const rpe = parseFloat(row.RPE) || 0;
 

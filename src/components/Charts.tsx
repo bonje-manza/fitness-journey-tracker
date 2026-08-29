@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, onSnapshot, doc, getDoc } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, doc, getDoc, where } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { DailyLog, UserTargets, WorkoutRecord } from "../types";
+import { DailyLog, UserTargets, WorkoutRecord, UnitSystem } from "../types";
+import { kgToLbs, getWeightLabel } from "../lib/units";
 import {
   LineChart,
   Line,
@@ -17,7 +18,7 @@ import {
   Legend
 } from "recharts";
 
-export function Charts({ userId }: { userId: string }) {
+export function Charts({ userId, dateRange, unitSystem }: { userId: string; dateRange: { start: string; end: string }; unitSystem: UnitSystem }) {
   const [logs, setLogs] = useState<DailyLog[]>([]);
   const [workouts, setWorkouts] = useState<WorkoutRecord[]>([]);
   const [targets, setTargets] = useState<UserTargets | null>(null);
@@ -25,13 +26,23 @@ export function Charts({ userId }: { userId: string }) {
 
   useEffect(() => {
     // Fetch Logs
-    const qLogs = query(collection(db, "users", userId, "logs"), orderBy("date", "asc"));
+    const qLogs = query(
+      collection(db, "users", userId, "logs"), 
+      where("date", ">=", dateRange.start),
+      where("date", "<=", dateRange.end),
+      orderBy("date", "asc")
+    );
     const unsubLogs = onSnapshot(qLogs, (snap) => {
       setLogs(snap.docs.map(doc => doc.data() as DailyLog));
     });
 
     // Fetch Workouts
-    const qWorkouts = query(collection(db, "users", userId, "workouts"), orderBy("date", "asc"));
+    const qWorkouts = query(
+      collection(db, "users", userId, "workouts"), 
+      where("date", ">=", dateRange.start),
+      where("date", "<=", dateRange.end),
+      orderBy("date", "asc")
+    );
     const unsubWorkouts = onSnapshot(qWorkouts, (snap) => {
       setWorkouts(snap.docs.map(doc => doc.data() as WorkoutRecord));
     });
@@ -52,7 +63,7 @@ export function Charts({ userId }: { userId: string }) {
       unsubLogs();
       unsubWorkouts();
     };
-  }, [userId]);
+  }, [userId, dateRange.start, dateRange.end]);
 
   if (loading) {
     return (
@@ -89,6 +100,13 @@ export function Charts({ userId }: { userId: string }) {
 
   const performanceData = Array.from(performanceDataMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 
+  const chartLogs = logs.map(log => ({
+    ...log,
+    displayWeight: unitSystem === "imperial" ? Number(kgToLbs(log.bodyWeight).toFixed(1)) : log.bodyWeight
+  }));
+
+  const weightUnit = getWeightLabel(unitSystem);
+
   // Custom Tooltip component
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -119,7 +137,7 @@ export function Charts({ userId }: { userId: string }) {
         
         <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={logs} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <ComposedChart data={chartLogs} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
               <XAxis 
                 dataKey="date" 
@@ -165,7 +183,7 @@ export function Charts({ userId }: { userId: string }) {
               )}
 
               <Bar yAxisId="cals" dataKey="caloriesConsumed" name="Calories" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={40} />
-              <Line yAxisId="weight" type="monotone" dataKey="bodyWeight" name="Weight (kg)" stroke="#10b981" strokeWidth={2} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+              <Line yAxisId="weight" type="monotone" dataKey="displayWeight" name={`Weight (${weightUnit})`} stroke="#10b981" strokeWidth={2} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>

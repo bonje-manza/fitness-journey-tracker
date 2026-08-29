@@ -1,3 +1,9 @@
+export type UnitSystem = "metric" | "imperial";
+
+export interface UserSettings {
+  unitSystem: UnitSystem;
+}
+
 export interface UserTargets {
   calories: number;
   protein: number;

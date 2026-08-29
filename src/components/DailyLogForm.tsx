@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { collection, doc, setDoc, getDoc, query, orderBy, limit, onSnapshot } from "firebase/firestore";
+import { collection, doc, setDoc, getDoc, query, orderBy, limit, onSnapshot, where } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { DailyLog, UserTargets } from "../types";
+import { DailyLog, UserTargets, UnitSystem } from "../types";
+import { convertWeightForInput, convertWeightToKgForStorage, getWeightLabel, lbsToKg, inchesToCm } from "../lib/units";
 import { Calculator, Save, History } from "lucide-react";
 import { format } from "date-fns";
 
-export function DailyLogForm({ userId }: { userId: string }) {
+export function DailyLogForm({ userId, dateRange, unitSystem }: { userId: string; dateRange: { start: string; end: string }; unitSystem: UnitSystem }) {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [steps, setSteps] = useState("");
   const [calories, setCalories] = useState("");
@@ -46,7 +47,7 @@ export function DailyLogForm({ userId }: { userId: string }) {
         setProtein(data.protein ? data.protein.toString() : "");
         setCarbs(data.carbs ? data.carbs.toString() : "");
         setFat(data.fat ? data.fat.toString() : "");
-        setBodyWeight(data.bodyWeight ? data.bodyWeight.toString() : "");
+        setBodyWeight(data.bodyWeight ? convertWeightForInput(data.bodyWeight, unitSystem).toString() : "");
         setSleep(data.sleepHours ? data.sleepHours.toString() : "");
       } else {
         // Clear if no data
@@ -80,12 +81,18 @@ export function DailyLogForm({ userId }: { userId: string }) {
 
   useEffect(() => {
     // Load recent logs
-    const q = query(collection(db, "users", userId, "logs"), orderBy("date", "desc"), limit(10));
+    const q = query(
+      collection(db, "users", userId, "logs"), 
+      where("date", ">=", dateRange.start),
+      where("date", "<=", dateRange.end),
+      orderBy("date", "desc"), 
+      limit(31)
+    );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setRecentLogs(snapshot.docs.map(doc => doc.data() as DailyLog));
     });
     return () => unsubscribe();
-  }, [userId]);
+  }, [userId, dateRange.start, dateRange.end]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +109,7 @@ export function DailyLogForm({ userId }: { userId: string }) {
         protein: parseFloat(protein) || 0,
         carbs: parseFloat(carbs) || 0,
         fat: parseFloat(fat) || 0,
-        bodyWeight: parseFloat(bodyWeight) || 0,
+        bodyWeight: convertWeightToKgForStorage(parseFloat(bodyWeight) || 0, unitSystem),
         sleepHours: parseFloat(sleep) || 0,
         timestamp: Date.now(),
       };
@@ -129,8 +136,14 @@ export function DailyLogForm({ userId }: { userId: string }) {
   };
 
   const calculateBaseline = () => {
-    const w = parseFloat(calcWeight) || 0;
-    const h = parseFloat(calcHeight) || 0;
+    let w = parseFloat(calcWeight) || 0;
+    let h = parseFloat(calcHeight) || 0;
+    
+    if (unitSystem === "imperial") {
+      w = lbsToKg(w);
+      h = inchesToCm(h);
+    }
+
     const a = parseFloat(calcAge) || 0;
     const act = parseFloat(calcActivity) || 1.2;
 
@@ -200,8 +213,8 @@ export function DailyLogForm({ userId }: { userId: string }) {
                     </select>
                   </div>
                   <InputField label="Age (years)" value={calcAge} onChange={setCalcAge} type="number" step="1" />
-                  <InputField label="Weight (kg)" value={calcWeight} onChange={setCalcWeight} type="number" step="0.1" />
-                  <InputField label="Height (cm)" value={calcHeight} onChange={setCalcHeight} type="number" step="1" />
+                  <InputField label={`Weight (${getWeightLabel(unitSystem)})`} value={calcWeight} onChange={setCalcWeight} type="number" step="0.1" />
+                  <InputField label={`Height (${unitSystem === 'imperial' ? 'in' : 'cm'})`} value={calcHeight} onChange={setCalcHeight} type="number" step="1" />
                   <div className="col-span-2 md:col-span-2">
                     <label className="block text-xs text-zinc-400 mb-1">Activity Level</label>
                     <select
@@ -257,7 +270,7 @@ export function DailyLogForm({ userId }: { userId: string }) {
               />
             </div>
 
-            <InputField label="Morning Body Weight (kg)" value={bodyWeight} onChange={setBodyWeight} type="number" step="0.01" required />
+            <InputField label={`Morning Body Weight (${getWeightLabel(unitSystem)})`} value={bodyWeight} onChange={setBodyWeight} type="number" step="0.01" required />
             <InputField label="Steps" value={steps} onChange={setSteps} type="number" step="1" />
             <InputField label="Sleep Quantity (hrs)" value={sleep} onChange={setSleep} type="number" step="0.1" />
             <InputField label="Calories Consumed" value={calories} onChange={setCalories} type="number" step="0.1" />
@@ -315,7 +328,7 @@ export function DailyLogForm({ userId }: { userId: string }) {
                     {log.date === format(new Date(), "yyyy-MM-dd") ? "Today" : log.date}
                   </span>
                   <span className="text-xs text-zinc-500">
-                    {log.bodyWeight ? `${log.bodyWeight} kg` : '-'}
+                    {log.bodyWeight ? `${convertWeightForInput(log.bodyWeight, unitSystem)} ${getWeightLabel(unitSystem)}` : '-'}
                   </span>
                 </div>
                 <div className="flex gap-3 text-xs text-zinc-400">
