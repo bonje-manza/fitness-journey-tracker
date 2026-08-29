@@ -1,0 +1,112 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // -- User Targets --
+    function isValidUserTargets(data) {
+      return data.keys().hasAll(['calories', 'protein', 'carbs', 'fat']) &&
+             data.keys().size() == 4 &&
+             data.calories is number &&
+             data.protein is number &&
+             data.carbs is number &&
+             data.fat is number;
+    }
+
+    // -- Daily Log --
+    function isValidDailyLog(data, userId) {
+      return data.keys().hasAll(['userId', 'date', 'steps', 'caloriesConsumed', 'protein', 'carbs', 'fat', 'bodyWeight', 'sleepHours', 'timestamp']) &&
+             data.keys().size() == 10 &&
+             data.userId == userId &&
+             data.date is string && data.date.size() <= 10 && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+             data.steps is number &&
+             data.caloriesConsumed is number &&
+             data.protein is number &&
+             data.carbs is number &&
+             data.fat is number &&
+             data.bodyWeight is number &&
+             data.sleepHours is number &&
+             data.timestamp is number;
+    }
+
+    // -- Workout Record --
+    function isValidWorkoutRecord(data, userId) {
+      return data.keys().hasAll(['userId', 'date', 'workoutName', 'exerciseName', 'sets', 'timestamp']) &&
+             data.keys().size() == 6 &&
+             data.userId == userId &&
+             data.date is string && data.date.size() <= 10 && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+             data.workoutName is string && data.workoutName.size() <= 100 &&
+             data.exerciseName is string && data.exerciseName.size() <= 100 &&
+             data.sets is list && data.sets.size() <= 50 &&
+             (data.sets.size() == 0 || (
+                data.sets[0].keys().hasAll(['reps', 'weight', 'rpe']) &&
+                data.sets[0].reps is number &&
+                data.sets[0].weight is number &&
+                data.sets[0].rpe is number
+             )) &&
+             data.timestamp is number;
+    }
+
+    // -- Progress Picture --
+    function isValidProgressPicture(data, userId) {
+      return data.keys().hasAll(['userId', 'date', 'imageUrl', 'bodyWeight', 'timestamp']) &&
+             data.keys().size() == 5 &&
+             data.userId == userId &&
+             data.date is string && data.date.size() <= 10 && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+             data.imageUrl is string && data.imageUrl.size() <= 1000000 &&
+             data.bodyWeight is number &&
+             data.timestamp is number;
+    }
+
+    match /users/{userId} {
+      match /settings/{settingId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidUserTargets(incoming());
+        allow delete: if isOwner(userId);
+      }
+      
+      match /logs/{logId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidDailyLog(incoming(), userId);
+        allow update: if isOwner(userId) && isValidDailyLog(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if isOwner(userId);
+      }
+
+      match /workouts/{workoutId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidWorkoutRecord(incoming(), userId);
+        allow update: if isOwner(userId) && isValidWorkoutRecord(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if isOwner(userId);
+      }
+
+      match /photos/{photoId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidProgressPicture(incoming(), userId);
+        allow update: if isOwner(userId) && isValidProgressPicture(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

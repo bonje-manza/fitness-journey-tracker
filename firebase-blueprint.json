@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "UserTargets": {
+      "title": "UserTargets",
+      "description": "Daily macro and calorie targets",
+      "type": "object",
+      "properties": {
+        "calories": { "type": "number" },
+        "protein": { "type": "number" },
+        "carbs": { "type": "number" },
+        "fat": { "type": "number" }
+      },
+      "required": ["calories", "protein", "carbs", "fat"]
+    },
+    "DailyLog": {
+      "title": "DailyLog",
+      "description": "Daily logged metrics",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "date": { "type": "string", "maxLength": 10, "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "steps": { "type": "number" },
+        "caloriesConsumed": { "type": "number" },
+        "protein": { "type": "number" },
+        "carbs": { "type": "number" },
+        "fat": { "type": "number" },
+        "bodyWeight": { "type": "number" },
+        "sleepHours": { "type": "number" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["userId", "date", "steps", "caloriesConsumed", "protein", "carbs", "fat", "bodyWeight", "sleepHours", "timestamp"]
+    },
+    "WorkoutRecord": {
+      "title": "WorkoutRecord",
+      "description": "Logged workout for an exercise",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "date": { "type": "string", "maxLength": 10, "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "workoutName": { "type": "string", "maxLength": 100 },
+        "exerciseName": { "type": "string", "maxLength": 100 },
+        "sets": { 
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "reps": { "type": "number" },
+              "weight": { "type": "number" },
+              "rpe": { "type": "number" }
+            }
+          }
+        },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["userId", "date", "workoutName", "exerciseName", "sets", "timestamp"]
+    },
+    "ProgressPicture": {
+      "title": "ProgressPicture",
+      "description": "A progress photo record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "date": { "type": "string", "maxLength": 10, "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "imageUrl": { "type": "string", "maxLength": 1000000 },
+        "bodyWeight": { "type": "number" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["userId", "date", "imageUrl", "bodyWeight", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/settings/{settingId}": {
+      "schema": "UserTargets",
+      "description": "User specific settings, e.g., targets"
+    },
+    "/users/{userId}/logs/{logId}": {
+      "schema": "DailyLog",
+      "description": "User's daily logs"
+    },
+    "/users/{userId}/workouts/{workoutId}": {
+      "schema": "WorkoutRecord",
+      "description": "User's imported workout history"
+    },
+    "/users/{userId}/photos/{photoId}": {
+      "schema": "ProgressPicture",
+      "description": "User's progress pictures"
+    }
+  }
+}
